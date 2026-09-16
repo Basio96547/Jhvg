@@ -1,0 +1,80 @@
+name: Deploy to GitHub Pages (Syria Optimized)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: npm ci
+
+    - name: Build with Syria optimizations
+      run: |
+        npm run build
+        
+        # إضافة ملفات تحسين للمنطقة العربية
+        echo "User-agent: *" > dist/robots.txt
+        echo "Allow: /" >> dist/robots.txt
+        echo "Sitemap: https://$(echo $GITHUB_REPOSITORY | cut -d'/' -f1).github.io/$(echo $GITHUB_REPOSITORY | cut -d'/' -f2)/sitemap.xml" >> dist/robots.txt
+        
+        # إضافة ملف sitemap بسيط
+        cat > dist/sitemap.xml << 'EOF'
+        <?xml version="1.0" encoding="UTF-8"?>
+        <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+          <url>
+            <loc>https://$(echo $GITHUB_REPOSITORY | cut -d'/' -f1).github.io/$(echo $GITHUB_REPOSITORY | cut -d'/' -f2)/</loc>
+            <lastmod>$(date -u +%Y-%m-%d)</lastmod>
+            <changefreq>daily</changefreq>
+            <priority>1.0</priority>
+          </url>
+        </urlset>
+        EOF
+        
+        # إضافة ملف manifest للـ PWA
+        cat > dist/manifest.json << 'EOF'
+        {
+          "name": "شاري مستعمل - موقع البيع والشراء الأول في سوريا",
+          "short_name": "شاري مستعمل",
+          "description": "أكبر موقع للبيع والشراء في سوريا",
+          "start_url": "/",
+          "display": "standalone",
+          "background_color": "#ffffff",
+          "theme_color": "#1e40af",
+          "lang": "ar",
+          "dir": "rtl",
+          "icons": [
+            {
+              "src": "/vite.svg",
+              "sizes": "192x192",
+              "type": "image/svg+xml"
+            }
+          ]
+        }
+        EOF
+      env:
+        CI: false
+
+    - name: Deploy to GitHub Pages
+      uses: peaceiris/actions-gh-pages@v3
+      if: github.ref == 'refs/heads/main'
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./dist
+        force_orphan: true
+        user_name: 'github-actions[bot]'
+        user_email: 'github-actions[bot]@users.noreply.github.com'
+        commit_message: 'Deploy to GitHub Pages 🚀'
